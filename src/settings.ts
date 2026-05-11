@@ -259,6 +259,25 @@ class CellElementsCard extends FormattingSettingsCard {
     ];
 }
 
+// ─── Function Button Card ───────────────────────────────────────────────────
+
+class FunctionButtonCard extends FormattingSettingsCard {
+    show            = toggleSlice("show", "Show button", true);
+    valueLabel      = new formattingSettings.TextInput({ name: "valueLabel",    displayName: "Label (values mode)",   value: "Values",         placeholder: "e.g. Values" });
+    functionLabel   = new formattingSettings.TextInput({ name: "functionLabel", displayName: "Label (function mode)", value: "Function Value", placeholder: "e.g. Market Share" });
+    fontSize        = fontSizeSlice("fontSize", "Text size", 11);
+    fontColor       = colorSlice("fontColor",       "Font color",       "#ffffff");
+    backgroundColor = colorSlice("backgroundColor", "Background color", "#2b5797");
+    borderColor     = colorSlice("borderColor",     "Border color",     "#1e3f7a");
+
+    name: string = "functionButton";
+    displayName: string = "Function Button";
+    slices: Array<FormattingSettingsSlice> = [
+        this.show, this.valueLabel, this.functionLabel,
+        this.fontSize, this.fontColor, this.backgroundColor, this.borderColor
+    ];
+}
+
 // ─── Specific Column Card ────────────────────────────────────────────────────
 
 class SpecificColumnCard extends FormattingSettingsCard {
@@ -317,7 +336,8 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
     columnGrandTotal = new ColumnGrandTotalCard();
     rowGrandTotal = new RowGrandTotalCard();
     cellElements = new CellElementsCard();
-    specificColumn = new SpecificColumnCard();
+    functionButton  = new FunctionButtonCard();
+    specificColumn  = new SpecificColumnCard();
 
     cards = [
         this.layoutPresets,
@@ -331,6 +351,7 @@ export class VisualFormattingSettingsModel extends FormattingSettingsModel {
         this.columnGrandTotal,
         this.rowGrandTotal,
         this.cellElements,
+        this.functionButton,
         this.specificColumn
     ];
 }
