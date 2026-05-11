@@ -40,6 +40,68 @@ export function formatValue(
     return (num / divisor).toFixed(dp) + suffix;
 }
 
+// ── Format-string based formatting ───────────────────────────────────────────
+// Applies a DAX/Excel format string (from valueSources[i].format) to a raw
+// numeric value. Covers the common cases: %, currency, comma-grouped numbers.
+
+export function applyFormatString(raw: any, formatStr: string | undefined): string | null {
+    if (formatStr === undefined || formatStr === null || formatStr === "") return null;
+    if (raw === null || raw === undefined || raw === "") return "";
+    const num = Number(raw);
+    if (isNaN(num)) return String(raw);
+
+    const fmt = formatStr.trim();
+
+    // ── Percentage ──────────────────────────────────────────────────────────
+    // Matches: "0%", "0.0%", "0.00%", "#,##0.0%", "#,##0%", "0.0 %;-0.0 %" etc.
+    if (fmt.includes("%")) {
+        const dpMatch = fmt.match(/0\.(0+)/);
+        const dp = dpMatch ? dpMatch[1].length : 0;
+        const pct = num * 100;
+        const useCommas = fmt.includes(",");
+        const formatted = useCommas
+            ? pct.toLocaleString(undefined, { minimumFractionDigits: dp, maximumFractionDigits: dp })
+            : pct.toFixed(dp);
+        return `${formatted}%`;
+    }
+
+    // ── Currency ────────────────────────────────────────────────────────────
+    // Matches format strings that start with a currency symbol or contain one
+    const currencyMatch = fmt.match(/^([£$€¥₹¢])/);
+    if (currencyMatch) {
+        const symbol = currencyMatch[1];
+        const dpMatch = fmt.match(/0\.(0+)/);
+        const dp = dpMatch ? dpMatch[1].length : 0;
+        const useCommas = fmt.includes(",");
+        const abs = Math.abs(num);
+        const formatted = useCommas
+            ? abs.toLocaleString(undefined, { minimumFractionDigits: dp, maximumFractionDigits: dp })
+            : abs.toFixed(dp);
+        return num < 0 ? `-${symbol}${formatted}` : `${symbol}${formatted}`;
+    }
+
+    // ── Comma-grouped number ─────────────────────────────────────────────────
+    // Matches: "#,##0", "#,##0.00", "#,###", "N0", "N2" etc.
+    if (fmt.includes(",") || /^N\d*$/i.test(fmt)) {
+        const dpMatch = fmt.match(/0\.(0+)/);
+        const nMatch = fmt.match(/^N(\d+)$/i);
+        const dp = dpMatch ? dpMatch[1].length : nMatch ? parseInt(nMatch[1], 10) : 0;
+        return num.toLocaleString(undefined, { minimumFractionDigits: dp, maximumFractionDigits: dp });
+    }
+
+    // ── Plain decimal ────────────────────────────────────────────────────────
+    // Matches: "0", "0.00", "0.000", "#.##", "F0", "F2" etc.
+    const dpMatch = fmt.match(/0\.(0+)/);
+    const fMatch = fmt.match(/^F(\d+)$/i);
+    if (dpMatch || fMatch) {
+        const dp = dpMatch ? dpMatch[1].length : fMatch ? parseInt(fMatch[1], 10) : 0;
+        return num.toFixed(dp);
+    }
+
+    // ── Fallback: let the raw value through ────────────────────────────────
+    return null; // caller should use its own formatValue
+}
+
 // ── Data bar ─────────────────────────────────────────────────────────────────
 
 export function computeDataBarStyle(
