@@ -5,7 +5,7 @@ import "./../style/visual.less";
 import * as React from "react";
 import { createRoot, Root } from "react-dom/client";
 import { MatrixApp } from "./components/MatrixApp";
-import { parseMatrix } from "./parser";
+import { MatrixRowNode, MatrixColNode, MatrixHeaderNode, parseMatrix } from "./parser";
 import { VisualFormattingSettingsModel } from "./settings";
 
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions;
@@ -19,8 +19,18 @@ export class Visual implements IVisual {
     private reactRoot: HTMLElement;
     private root: Root;
 
+    // Cache the last successfully parsed matrix data so that formatting-only
+    // updates (which Power BI fires without refreshing the matrix in dataViews)
+    // still re-render with live data instead of falling to the empty state.
+    private cachedRows: MatrixRowNode[] = [];
+    private cachedColumns: MatrixColNode[] = [];
+    private cachedHeaderTree: MatrixHeaderNode[] = [];
+    private cachedFunctionValueColIndices: Set<number> = new Set();
+    private hasData = false;
+
     constructor(options: VisualConstructorOptions) {
         this.formattingSettingsService = new FormattingSettingsService();
+        this.formattingSettings = new VisualFormattingSettingsModel();
         this.target = options.element;
         this.target.style.overflow = "hidden";
 
@@ -32,20 +42,36 @@ export class Visual implements IVisual {
     }
 
     public update(options: VisualUpdateOptions) {
-        this.formattingSettings = this.formattingSettingsService.populateFormattingSettingsModel(
-            VisualFormattingSettingsModel,
-            options.dataViews[0]
-        );
+        // Always re-populate settings when a dataView is present (covers both
+        // data updates and formatting-pane changes that include a dataView).
+        if (options.dataViews && options.dataViews.length > 0 && options.dataViews[0]) {
+            this.formattingSettings = this.formattingSettingsService.populateFormattingSettingsModel(
+                VisualFormattingSettingsModel,
+                options.dataViews[0]
+            );
 
-        if (options.dataViews && options.dataViews.length > 0 && options.dataViews[0].matrix) {
-            const { rows, columns, headerTree } = parseMatrix(options.dataViews[0]);
+            // Only refresh the cached matrix data when the matrix is actually present.
+            if (options.dataViews[0].matrix) {
+                const { rows, columns, headerTree, functionValueColIndices } = parseMatrix(options.dataViews[0]);
+                this.cachedRows = rows;
+                this.cachedColumns = columns;
+                this.cachedHeaderTree = headerTree;
+                this.cachedFunctionValueColIndices = functionValueColIndices;
+                this.hasData = true;
+            }
+        }
 
+        if (this.hasData) {
+            // Re-render with (possibly cached) data and the latest settings.
+            // Spreading ensures React sees a new settings reference every time.
             this.root.render(
                 React.createElement(MatrixApp, {
-                    rows,
-                    columns,
-                    headerTree,
-                    settings: this.formattingSettings
+                    rows: this.cachedRows,
+                    columns: this.cachedColumns,
+                    headerTree: this.cachedHeaderTree,
+                    settings: this.formattingSettings,
+                    functionValueColIndices: this.cachedFunctionValueColIndices,
+                    renderKey: Date.now()
                 })
             );
         } else {
